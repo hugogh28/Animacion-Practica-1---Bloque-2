@@ -17,13 +17,17 @@ public class MassSpringCloth : MonoBehaviour
 
     public float h = 0.1f; //El paso de integración
 
-    public List<Spring> springs; //Quizás deba ponerse en el método Start()
+    public List<Spring> ListOfSprings; //Lista de muelles
+    bool springListIsFull = false; //Booleano para comprobar si la lista de muelles está llena
+    bool nodeListIsFull = false; //Booleano para comprobar si la lista de nodos está llena
 
-    public List<Node> ListOfNodes;
+    public List<Node> ListOfNodes; //Lista de nodos
 
     public Vector3 g = new Vector3(0f, 9.8f, 0f); //El valor de la gravedad aplicado al objeto masa-muelle (está en m/s)
 
-    public float k = 100f; //Constante de rigidez de los muelles
+    public float kT = 100f; //Constante de rigidez de los muelles de tracción
+    public float kF = 100f; //Constante de rigidez de los muelles de flexión
+
 
     void Start()
     {
@@ -31,71 +35,61 @@ public class MassSpringCloth : MonoBehaviour
 
         Vector3[] vertices = mesh.vertices; //Se guardan en un array todos los vértices de la mesh
 
-        Debug.Log(vertices.Count());
-
         List<Node> nodes = new List<Node>(vertices.Length); //Se crea una lista de nodos cuyo tamaño sea el de los vértices de la mesh
+        List<Spring> springs = new List<Spring>(); //Se crea una lista de muelles cuyo tamaño es indefinido (ya que se presupone que podemos usar cualquier bandera)
 
-        for(int i = 0; i < vertices.Length; i++)
+        for(int i = 0; i < vertices.Length; i++) //Se itera tantas veces como vértices hay en el array vertices
         {
             nodes.Add(new Node(vertices[i])); //Cada vez que se itera sobre el bucle de vértices de la mesh, se añade un nuevo nodo, cuya posición corresponde a la de su vértice
         }
+        nodeListIsFull = true; //Se activa el booleano nodeListIsFull cuando la lista de nodos se ha llenado con todos los elementos del objeto
 
-        ListOfNodes = nodes;
+        ListOfNodes = nodes; //Para poder hacer uso de OnDrawGizmos() se pasa la lista nodes a ListOfNodes
+
+
 
         int[] triangles = mesh.triangles; //Se guardan en un array todos los triángulos de la mesh
 
-        Debug.Log(triangles.Count());
-
-        if (nodes.Count == 0)
-            Debug.Log("Son nulos");
-        else
-            Debug.Log(nodes.Count());
-
-        Gizmos.color = Color.red;
-        //Gizmos.matrix = transform.localToWorldMatrix;
-
-        for (int i = 0; i < triangles.Length; i++) //Por corregir, no es una forma limpia de añadir gizmos y springs
+        for (int i = 0; i < triangles.Length - 3; i++)  //Se itera tantas veces como vértices (de cada triángulo) hay en el array triangles
         {
-            if (!(triangles[i] == triangles.Length - 3) && !(triangles[i] == triangles.Length - 2))
-            {
-                //Como cada triángulo contiene 3 integers, cada uno de ellos, correspondiente a un vértice, se deberá relacionar dichos índices con los vértices
-
-                springs.Add(new Spring(k, nodes[triangles[i]], nodes[triangles[i + 1]])); //Se deben corresponder los índices de cada triángulo con cada nodo, es decir, que se debe tener en cuenta que cada nodo puede estar en más de un triángulo
-                Gizmos.DrawLine(nodes[triangles[i]].pos, nodes[triangles[i + 1]].pos); //Las líneas deben dibujarse sobre los muelles, por lo que cuando se deduzcan los nodos conectados, se pintarán sus muelles
-                springs.Add(new Spring(k, nodes[triangles[i]], nodes[triangles[i + 2]]));
-                Gizmos.DrawLine(nodes[triangles[i]].pos, nodes[triangles[i + 2]].pos);
-            }
-            else if (!(triangles[i] == triangles.Length - 2))
-            {
-                springs.Add(new Spring(k, nodes[i], nodes[i + 1]));
-                Gizmos.DrawLine(nodes[triangles[i]].pos, nodes[triangles[i + 1]].pos);
-            }
+            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo
+            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo
+            springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo
         }
+        springListIsFull = true; //Se activa el booleano springListIsFull cuando la lista de muelles se ha llenado con todos los elementos del objeto
 
+        ListOfSprings = springs; //Para poder hacer uso de OnDrawGizmos() se pasa la lista springs a ListOfSprings
     }
 
     private void OnDrawGizmos()
     {
         //Dibujado de los gizmos de los nodos en coordenadas globales
+        Gizmos.matrix = transform.localToWorldMatrix; //Se hace el paso de coordenadas locales a globales para evitgar que los gizmos se pinten en otro lugar que no sea el nodo correspondiente
+        DrawIfNotNull(); //Se trata de dibujar los gizmos
+    }
 
-        Gizmos.color = Color.green;
-        Gizmos.matrix = transform.localToWorldMatrix;
-        foreach (Node node in ListOfNodes)
+    //Para evitar llamadas a elementos no existentes usamos el método DrawIfNotNull, que comprueba si las listas de nodos y muelles han sido inizialidas y llenadas para evitar
+    //rellenar Gizmos que no existen
+    void DrawIfNotNull()
+    {
+        if (nodeListIsFull) 
         {
-            Gizmos.DrawSphere(node.pos, 0.2f);
+            Gizmos.color = Color.green; //Se asigna color verde a los gizmos esféricos de los nodos
+            foreach (var node in ListOfNodes) //Se recorre cada nodo de la lista
+            {
+                Gizmos.DrawSphere(node.pos, 0.2f); //Se pinta una esfera de radio 0.2 (unidades de Unity) sobre cada nodo de la lista
+            }
         }
 
-        Gizmos.color = Color.red;
-        foreach(Spring spring in springs)
+        if (springListIsFull)
         {
-            Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos);
+            Gizmos.color = Color.red;
+            foreach (var spring in ListOfSprings) //Se recorre cada muelle de la lista
+            {
+                //Gizmos.color = Color.red;
+                Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
+            }
         }
-
-        /*foreach (Spring in springs) 
-        {
-            Gizmos.DrawLine();
-        }*/
-
     }
 
     Vector3 VectorBetweenNodes(Node A, Node B) //Calcula la distancia entre dos nodos 

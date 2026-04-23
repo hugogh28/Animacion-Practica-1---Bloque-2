@@ -1,4 +1,6 @@
+using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
+using UnityEngine.Android;
 
 public class Spring 
 {
@@ -21,13 +23,53 @@ public class Spring
         k = cElasticity;
         nodeA = A; 
         nodeB = B;
-
+        u = VectorBetweenNodes(A, B);
+        length0 = u.magnitude;
+        u = Vector3.Normalize(u);
+        pos = (A.pos + B.pos) / 2f;
+        rotation = Quaternion.FromToRotation(Vector3.up, u);
         //Para hallar la distancia por defecto de un muelle, se debe calcular para cada uno
+    }
+
+    Vector3 VectorBetweenNodes(Node A, Node B) //Calcula el vector entre dos nodos 
+    {
+        return new Vector3(B.pos.x - A.pos.x, B.pos.y - A.pos.y, B.pos.z - A.pos.z);
     }
 
     /*float DistanceBetweenNodes() 
     {
         
     }*/
+    void Update()
+    {
+        if (Input.GetKeyUp(KeyCode.P))
+        {
+            paused = !paused;
+        }
+    }
 
+    private void FixedUpdate()
+    {
+        if (paused)
+            return;
+
+        switch (integrationMethod)
+        {
+            case Integration.ExplicitEuler:
+                integrateExplicitEuler();
+                break;
+            case Integration.SymplecticEuler:
+                integrateSymplecticEuler();
+                break;
+            default:
+                print("ERROR METODO DE INTEGRACION DESCONOCIDO");
+                break;
+        }
+
+        u = VectorBetweenNodes(nodeA, nodeB);
+        length0 = u.magnitude;
+        u = Vector3.Normalize(u);
+        pos = (nodeA.pos + nodeB.pos) / 2f;
+        rotation = Quaternion.FromToRotation(Vector3.up, u);
+    }
 }
