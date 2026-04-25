@@ -20,15 +20,14 @@ public class Spring
 
     public Spring(float cElasticity, Node A, Node B)
     {
-        k = cElasticity;
-        nodeA = A; 
-        nodeB = B;
-        u = VectorBetweenNodes(A, B);
-        length0 = u.magnitude;
-        u = Vector3.Normalize(u);
-        pos = (A.pos + B.pos) / 2f;
-        rotation = Quaternion.FromToRotation(Vector3.up, u);
-        //Para hallar la distancia por defecto de un muelle, se debe calcular para cada uno
+        k = cElasticity; //Asignamos al nodo su constante de rigidez
+        nodeA = A; //El nodo A del muelle, corresponde con el primer nodo recibido al crear un nuevo muelle
+        nodeB = B; //El nodo B del muelle, corresponde con el segundo nodo recibido al crear un nuevo muelle
+        u = VectorBetweenNodes(A, B); //Vector dirección entre el primer y el segundo nodo del muelle
+        length0 = u.magnitude; //Longitud inicial del muelle, calculada en base al vector de dirección inicial entre sus dos nodos
+        u = Vector3.Normalize(u); //Vector normalizado que almacena la orientación del muelle
+        pos = (A.pos + B.pos) / 2f; //Posición del punto medio del muelle, calculado en base a la media aritmética de las posiciones de sus nodos
+        rotation = Quaternion.FromToRotation(Vector3.up, u); //Orientación del muelle según el vector dirección
     }
 
     Vector3 VectorBetweenNodes(Node A, Node B) //Calcula el vector entre dos nodos 
@@ -40,36 +39,4 @@ public class Spring
     {
         
     }*/
-    void Update()
-    {
-        if (Input.GetKeyUp(KeyCode.P))
-        {
-            paused = !paused;
-        }
-    }
-
-    private void FixedUpdate()
-    {
-        if (paused)
-            return;
-
-        switch (integrationMethod)
-        {
-            case Integration.ExplicitEuler:
-                integrateExplicitEuler();
-                break;
-            case Integration.SymplecticEuler:
-                integrateSymplecticEuler();
-                break;
-            default:
-                print("ERROR METODO DE INTEGRACION DESCONOCIDO");
-                break;
-        }
-
-        u = VectorBetweenNodes(nodeA, nodeB);
-        length0 = u.magnitude;
-        u = Vector3.Normalize(u);
-        pos = (nodeA.pos + nodeB.pos) / 2f;
-        rotation = Quaternion.FromToRotation(Vector3.up, u);
-    }
 }

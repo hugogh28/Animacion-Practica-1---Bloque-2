@@ -92,13 +92,133 @@ public class MassSpringCloth : MonoBehaviour
         }
     }
 
-    Vector3 VectorBetweenNodes(Node A, Node B) //Calcula la distancia entre dos nodos 
-    {
-        return new Vector3(B.pos.x - A.pos.x, B.pos.y - A.pos.y, B.pos.z - A.pos.z);
-    }
-
+    // Update is called once per frame
     void Update()
     {
+        if (Input.GetKeyUp(KeyCode.P)) // Detectamos si se ha pulsado la tecla P
+        {
+            // La tecla P hace de "toggle" para pausar o quitar la pausa de la
+            // animación
+            paused = !paused;
+        }
+    }
 
+    private void FixedUpdate()
+    {
+        if (paused)
+            // Si está pausada la animación, no hacemos nada y regresamos
+            return;
+
+        // Según el método de integración escogido, se invoca una función u otra
+        switch (integrationMethod)
+        {
+            case Integration.ExplicitEuler:
+                integrateExplicitEuler();
+                break;
+
+            case Integration.SymplecticEuler:
+                integrateSymplecticEuler();
+                break;
+            default:
+                print("ERROR METODO INTEGRACION DESCONOCIDO");
+                break;
+        }
+
+        // Recorremos la lista de muelles para recalcularlos, una vez que hemos
+        // calculado la nueva posición de los nodos con el método de integración
+        foreach (Spring spring in ListOfSprings)
+        {
+            // Vector dirección del muelle, apunta de B a A            
+            spring.u = spring.nodeA.pos - spring.nodeB.pos;
+            // Nueva longitud del muelle 
+            spring.length = spring.u.magnitude;
+            // Normalizamos el vector que almacena la orientación del muelle
+            spring.u = Vector3.Normalize(spring.u);
+            // Posición del punto medio del muelle: media aritmética de las
+            // posiciones de los dos nodos
+            spring.pos = (spring.nodeA.pos + spring.nodeB.pos) / 2f;
+            // Orientamos correctamente el muelle según el vector dir
+            spring.rotation = Quaternion.FromToRotation(Vector3.up, spring.u);
+        }
+    }
+
+    /// <summary>
+    /// Método de integración de Euler Explícito
+    /// </summary>
+    void integrateExplicitEuler()
+    {
+        // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
+        // ellos
+        foreach (Node node in ListOfNodes)
+        {
+            if (!node.fixedNode) // Si el nodo no es fijo
+            {
+                // r_(n+1) = r_n + h * v_n
+                node.pos += h * node.vel;
+                node.force = -node.mass * g;
+            }
+        }
+
+        // Recorremos la lista de muelles para añadir a cada nodo la fuerza
+        // elástica de cada muelle. Por la ley de acción y reacción, estas
+        // fuerzas son iguales y de sentidos opuestos en los extremos de cada
+        // muelle
+        foreach (Spring spring in ListOfSprings)
+        {
+            spring.nodeA.force += -spring.k * (spring.length - spring.length0)
+                * spring.u;
+            spring.nodeB.force += spring.k * (spring.length - spring.length0)
+                * spring.u;
+        }
+
+        // Recorremos de nuevo la lista de nodos para calcular la nueva
+        // velocidad, una vez que ya conocemos la fuerza total en cada nodo
+        foreach (Node node in ListOfNodes)
+        {
+            if (!node.fixedNode) // Si el nodo no es fijo
+            {
+                // v_(n+1) = v_n + h F_n / m
+                node.vel += h * node.force / node.mass;
+            }
+        }
+    }
+
+    /// <summary>
+    ///  Método de integración de Euler Simpléctico
+    /// </summary>
+    void integrateSymplecticEuler()
+    {
+        // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
+        // ellos
+        foreach (Node node in ListOfNodes)
+        {
+            node.force = -node.mass * g;
+        }
+
+        // Recorremos la lista de muelles para añadir a cada nodo la fuerza
+        // elástica de cada muelle. Por la ley de acción y reacción, estas
+        // fuerzas son iguales y de sentidos opuestos en los extremos de cada
+        // muelle
+        foreach (Spring spring in ListOfSprings)
+        {
+            spring.nodeA.force += -spring.k * (spring.length - spring.length0)
+                * spring.u;
+            spring.nodeB.force += spring.k * (spring.length - spring.length0)
+                * spring.u;
+        }
+
+        // Recorremos de nuevo la lista de nodos para calcular la nueva
+        // velocidad y la nueva posición, una vez que ya conocemos la fuerza
+        // total en cada nodo
+        foreach (Node node in ListOfNodes)
+        {
+            if (!node.fixedNode) // Si el nodo no es fijo
+            {
+                // v_(n+1) = v_n + h F_n / m
+                node.vel += h * node.force / node.mass;
+                // r_(n+1) = r_n + h * v_(n+1)
+                node.pos += h * node.vel;
+            }
+        }
     }
 }
