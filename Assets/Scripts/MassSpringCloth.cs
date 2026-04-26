@@ -5,6 +5,8 @@ using UnityEngine;
 
 public class MassSpringCloth : MonoBehaviour
 {
+    public float mass = 5f;
+
     public bool paused; //Booleano que nos servirá para pausar la animación
 
     public enum Integration //Los diferentes métodos de integración disponibles
@@ -28,19 +30,34 @@ public class MassSpringCloth : MonoBehaviour
     public float kT = 100f; //Constante de rigidez de los muelles de tracción
     public float kF = 100f; //Constante de rigidez de los muelles de flexión
 
+    public List<Fixer> fixer = new List<Fixer>(); //Desde Unity se hará por esta línea la asignación del fixer, es decir, del cubo que fija nodos, a este script para que los nodos se fijen
+
+    Mesh cloth;
+
+    Vector3[] verts;
+
+
 
     void Start()
     {
         Mesh mesh = this.GetComponent<MeshFilter>().mesh; //Se guarda en la variable mesh el mallado del objeto
 
+        cloth = mesh; //Para poder hacer las modificaciones en la malla, se guarda la mesh en una variable global
+
         Vector3[] vertices = mesh.vertices; //Se guardan en un array todos los vértices de la mesh
+
+        verts = vertices; //Para poder hacer las modificaciones en la mesh, se guardan los vértices de la mesh en una variable global
 
         List<Node> nodes = new List<Node>(vertices.Length); //Se crea una lista de nodos cuyo tamaño sea el de los vértices de la mesh
         List<Spring> springs = new List<Spring>(); //Se crea una lista de muelles cuyo tamaño es indefinido (ya que se presupone que podemos usar cualquier bandera)
 
         for(int i = 0; i < vertices.Length; i++) //Se itera tantas veces como vértices hay en el array vertices
         {
-            nodes.Add(new Node(vertices[i])); //Cada vez que se itera sobre el bucle de vértices de la mesh, se añade un nuevo nodo, cuya posición corresponde a la de su vértice
+            nodes.Add(new Node(vertices[i], fixer)); //Cada vez que se itera sobre el bucle de vértices de la mesh, se añade un nuevo nodo, cuya posición corresponde a la de su vértice
+                                                     //Además, se comprueba, mediante la lista de fixers, si dicho nodo debe estar fijado antes de comenzar la animación
+            Debug.Log("\t \t Distancia del nodo " + i + " con el primer fixer: "+nodes[i].offset[0].sqrMagnitude);
+            Debug.Log("\t \t Distancia del nodo " + i + " con el segundo fixer: " + nodes[i].offset[1].sqrMagnitude);
+            Debug.Log("Posición del nodo: " + nodes[i].pos);
         }
         nodeListIsFull = true; //Se activa el booleano nodeListIsFull cuando la lista de nodos se ha llenado con todos los elementos del objeto
 
@@ -50,11 +67,11 @@ public class MassSpringCloth : MonoBehaviour
 
         int[] triangles = mesh.triangles; //Se guardan en un array todos los triángulos de la mesh
 
-        for (int i = 0; i < triangles.Length - 3; i++)  //Se itera tantas veces como vértices (de cada triángulo) hay en el array triangles
+        for (int i = 0; i < triangles.Length - 3; i+=3)  //Se itera tantas veces como triángulos hay en el array triangles, es decir, que si hay 600 vértices en el array, iteramos 200 veces
         {
-            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo
-            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo
-            springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo
+            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+            springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+            springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
         }
         springListIsFull = true; //Se activa el booleano springListIsFull cuando la lista de muelles se ha llenado con todos los elementos del objeto
 
@@ -147,6 +164,7 @@ public class MassSpringCloth : MonoBehaviour
     /// </summary>
     void integrateExplicitEuler()
     {
+        int i = 0;
         // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
         // ellos
         foreach (Node node in ListOfNodes)
@@ -154,9 +172,13 @@ public class MassSpringCloth : MonoBehaviour
             if (!node.fixedNode) // Si el nodo no es fijo
             {
                 // r_(n+1) = r_n + h * v_n
+
                 node.pos += h * node.vel;
-                node.force = -node.mass * g;
+                this.GetComponent<MeshFilter>().mesh.vertices[i].Set(node.pos.x, node.pos.y, node.pos.z);
+                this.GetComponent<MeshFilter>().mesh.RecalculateBounds();
+                node.force = -(mass/*/ListOfNodes.Count*/) * g;
             }
+            i++;
         }
 
         // Recorremos la lista de muelles para añadir a cada nodo la fuerza
@@ -178,7 +200,7 @@ public class MassSpringCloth : MonoBehaviour
             if (!node.fixedNode) // Si el nodo no es fijo
             {
                 // v_(n+1) = v_n + h F_n / m
-                node.vel += h * node.force / node.mass;
+                node.vel += h * node.force / (mass/*/ListOfNodes.Count*/);
             }
         }
     }
@@ -188,11 +210,12 @@ public class MassSpringCloth : MonoBehaviour
     /// </summary>
     void integrateSymplecticEuler()
     {
+        int i = 0;
         // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
         // ellos
         foreach (Node node in ListOfNodes)
         {
-            node.force = -node.mass * g;
+            node.force = -(mass) * g;
         }
 
         // Recorremos la lista de muelles para añadir a cada nodo la fuerza
@@ -212,13 +235,17 @@ public class MassSpringCloth : MonoBehaviour
         // total en cada nodo
         foreach (Node node in ListOfNodes)
         {
+            
             if (!node.fixedNode) // Si el nodo no es fijo
             {
                 // v_(n+1) = v_n + h F_n / m
-                node.vel += h * node.force / node.mass;
+                node.vel += h * node.force / (mass);
                 // r_(n+1) = r_n + h * v_(n+1)
                 node.pos += h * node.vel;
+                this.GetComponent<MeshFilter>().mesh.vertices[i].Set(node.pos.x, node.pos.y, node.pos.z);
+                this.GetComponent<MeshFilter>().mesh.RecalculateBounds();
             }
+            i++;
         }
     }
 }

@@ -1,17 +1,52 @@
+using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 
 public class Node
 {
-    public float mass = 5f;
+    //public float mass = 5f;
     public bool fixedNode;
 
     public Vector3 pos;
+    public Vector3 posGlobal;
     public Vector3 vel;
     public Vector3 force;
+    public List<Vector3> offset = new List<Vector3>();
+    List<float> sqrDistance = new List<float>();
 
-    public Node(Vector3 assignedPos) //Constructor de la clase, para asignar los disintos nodos a su correspondiente vértice
+    public Node(Vector3 assignedPos, List<Fixer> fixers) //Constructor de la clase, para asignar los disintos nodos a su correspondiente vértice
     {
         pos = assignedPos;
+        //posGlobal = get
+        for(int i = 0; i<fixers.Count; i++)
+        {
+            offset.Add(fixers[i].pos-pos);
+            sqrDistance.Add(offset[i].sqrMagnitude);
+            if (sqrDistance[i] <= 1) //Sabiendo que el fixer, un cubo, tiene un tamaño aproximado de 1 unidad de Unity,
+                                     //y que la distancia se halla entre un nodo y el centro del cubo.
+                                     //Se asigna que la distancia mínima cuadrada (para fijar un nodo) debe ser de 1 al cuadrado (1)
+            {//Se calcula la distancia entre el nodo y el fixer usando sqrMagnitude,
+             //que es más eficiente que magnitude por prescindir del cáculo de la raíz cuadrada.
+             //De este modo, se deduce si el nodo debe ser fijado o no si la distancia entre ambas es menor o igual a 0.1 unidades de Unity
+                fixedNode = true;
+            }
+            else if(fixedNode == false) //Para evitar que en la segunda iteración, se registre a nodos fijos como no fijos
+            {
+                fixedNode = false;
+            }
+            
+        }
+        //offset = fixer.pos - pos;
+        //sqrDistance = offset.sqrMagnitude;
+        /*if(sqrDistance <=0.01 ) {//Se calcula la distancia entre el nodo y el fixer usando sqrMagnitude,
+                                  //que es más eficiente que magnitude por prescindir del cáculo de la raíz cuadrada.
+                                  //De este modo, se deduce si el nodo debe ser fijado o no si la distancia entre ambas es menor o igual a 0.1 unidades de Unity
+            fixedNode = true;
+        }
+        else
+        {
+            fixedNode= false;
+        }*/
     }
 
     /*void Start()
