@@ -16,7 +16,7 @@ public class Spring
     public Quaternion rotation; // Nos permitirá calcular la orientación del
                                 // muelle  
     public Node nodeA; // Primer extremo del muelle
-    public Node nodeB;
+    public Node nodeB; // Segundo extremo del muelle
 
     public Spring(float cElasticity, Node A, Node B)
     {
@@ -30,13 +30,8 @@ public class Spring
         rotation = Quaternion.FromToRotation(Vector3.up, u); //Orientación del muelle según el vector dirección
     }
 
-    Vector3 VectorBetweenNodes(Node A, Node B) //Calcula el vector entre dos nodos 
+    Vector3 VectorBetweenNodes(Node A, Node B) //Calcula el vector (de dirección) entre dos nodos 
     {
         return new Vector3(B.pos.x - A.pos.x, B.pos.y - A.pos.y, B.pos.z - A.pos.z);
     }
-
-    /*float DistanceBetweenNodes() 
-    {
-        
-    }*/
 }

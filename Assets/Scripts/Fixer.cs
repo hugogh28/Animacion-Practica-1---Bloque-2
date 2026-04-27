@@ -22,7 +22,8 @@ public class Fixer : MonoBehaviour
             Hide();
         }
         Hide(); //Esto permitirá manejar que se muestre (u oculte) solo un fixer, usando el tick de su interfaz
-                //esta función puede desincronizar el cómo se ven los fixers
+                //Esta función puede desincronizar el MeshRenderer de los fixers (uno puede estar oculto y el otro no),
+                //aunque esto, se soluciona simplemente volviendo a cambiar el valor de hidden en el inspector de Unity
 
     }
 

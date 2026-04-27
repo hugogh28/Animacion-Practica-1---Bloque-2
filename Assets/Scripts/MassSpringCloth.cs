@@ -6,9 +6,16 @@ using UnityEngine;
 
 public class MassSpringCloth : MonoBehaviour
 {
-    public float mass = 5f;
-    
+    [Header("Modificadores de la animación")]
     public bool paused; //Booleano que nos servirá para pausar la animación
+    public float mass = 0.1f; //Masa del objeto (100 gramos)
+    public Vector3 g = new Vector3(0f, 9.8f, 0f); //El valor de la gravedad aplicado al objeto masa-muelle (está en m/s)
+    public float dampingNodes = 0.01f; //Amortiguamiento para el movimiento absoluto de los nodos
+    public float dampingSprings = 0.2f; //Amortiguamiento para frenar la deformación de los muelles
+
+    //private int traccion = 0;
+    //private int flexion = 0;
+
 
     public enum Integration //Los diferentes métodos de integración disponibles
     {
@@ -16,9 +23,11 @@ public class MassSpringCloth : MonoBehaviour
         SymplecticEuler = 1
     }
 
+    [Header("Métodos de integración")]
     public Integration integrationMethod; //Este será el método de integración escogido
 
-    public float h = 0.02f; //El paso de integración
+    [Header("Paso de integración")]
+    public float h = 0.02f; //El paso de integración (cuanto más rápido sea, más inestable puede ser)
 
     public List<Spring> ListOfSprings; //Lista de muelles
     bool springListIsFull = false; //Booleano para comprobar si la lista de muelles está llena
@@ -26,11 +35,12 @@ public class MassSpringCloth : MonoBehaviour
 
     public List<Node> ListOfNodes; //Lista de nodos
 
-    public Vector3 g = new Vector3(0f, 9.8f, 0f); //El valor de la gravedad aplicado al objeto masa-muelle (está en m/s)
 
-    public float kT = 100f; //Constante de rigidez de los muelles de tracción
-    public float kF = 100f; //Constante de rigidez de los muelles de flexión
+    [Header("Constantes de rigidez")]
+    public float kT = 20f; //Constante de rigidez de los muelles de tracción
+    public float kF = 0.5f; //Constante de rigidez de los muelles de flexión
 
+    [Header("Fijadores")]
     public List<Fixer> fixer = new List<Fixer>(); //Desde Unity se hará por esta línea la asignación del fixer, es decir, del cubo que fija nodos, a este script para que los nodos se fijen
 
     Mesh cloth;
@@ -81,27 +91,27 @@ public class MassSpringCloth : MonoBehaviour
             edges[i+1] = new Vector3Int(Math.Min(triangles[i], triangles[i + 2]), Math.Max(triangles[i], triangles[i + 2]), triangles[i + 1]); // ACB
             edges[i+2] = new Vector3Int(Math.Min(triangles[i + 1], triangles[i + 2]), Math.Max(triangles[i + 1], triangles[i + 2]), triangles[i]);// BCA 
 
-            int x = i + 1;
-            int y = i + 2;
-            Debug.Log("Arista " + i + ": " + edges[i].x + " " + edges[i].y + " " + edges[i].z);
-            Debug.Log("Arista " + x + ": " + edges[i+1].x + " " + edges[i+1].y + " " + edges[i+1].z);
-            Debug.Log("Arista " + y + ": " + edges[i+2].x + " " + edges[i+2].y + " " + edges[i+2].z);
+            //int x = i + 1;
+            //int y = i + 2;
+            //Debug.Log("Arista " + i + ": " + edges[i].x + " " + edges[i].y + " " + edges[i].z);
+            //Debug.Log("Arista " + x + ": " + edges[i+1].x + " " + edges[i+1].y + " " + edges[i+1].z);
+            //Debug.Log("Arista " + y + ": " + edges[i+2].x + " " + edges[i+2].y + " " + edges[i+2].z);
         }
 
         edges = edges.OrderBy(edge => edge.x).ThenBy(edge => edge.y).ToArray(); //Ordenamos el array edges en función del primer parámetro de una arista, y luego, en función del segundo parámetro
 
-        for(int i = 0; i < edges.Length - 2; i++) //Se itera tantas veces como aristas hay (600 en el caso original)
+        for(int i = 0; i < edges.Length; i++) //Se itera tantas veces como aristas hay (600 en el caso original)
         {
 
-            if (edges[i].x == edges[i + 1].x && edges[i].y == edges[i + 1].y) //Si dos aristas (adyacentes en la lista) se detectan como duplicadas, se añadirá un nodo de flexión y se evitará añadir un muelle de tracción
+            if (i<edges.Length-1&&edges[i].x == edges[i + 1].x && edges[i].y == edges[i + 1].y) //Si dos aristas (adyacentes en la lista) se detectan como duplicadas, se añadirá un nodo de flexión y se evitará añadir un muelle de tracción
             {
                 springs.Add(new Spring(kF, nodes[edges[i].z], nodes[edges[i + 1].z])); //Se añade un nodo de flexión entre nodos opuestos de triángulos adyacentes
+                //flexion++;
             }
             else
             {
-                springs.Add(new Spring(kT, nodes[edges[i].x], nodes[edges[i].y])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
-                springs.Add(new Spring(kT, nodes[edges[i].x], nodes[edges[i].z])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
-                springs.Add(new Spring(kT, nodes[edges[i].y], nodes[edges[i].z])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+                springs.Add(new Spring(kT, nodes[edges[i].x], nodes[edges[i].y])); //Añade un muelle de tracción entre los vértices de la arista
+                //traccion++;
             }
         }
 
@@ -163,7 +173,9 @@ public class MassSpringCloth : MonoBehaviour
             //Debug.Log("Triángulo " + i / 3 + ": " + triangles[i] + " " + triangles[i + 1] + " " + triangles[i + 2]);
         }*/
 
-        Debug.Log(springs.Count); //El número total debería ser, en este caso, 221, la suma de los muelles horizontales, diagonales y verticales
+        //Debug.Log(springs.Count); //El número total de flexión y de tracción
+        //Debug.Log("Hay " + flexion + " muelles de flexión");
+        //Debug.Log("Hay " + traccion + " muelles de tracción");
         springListIsFull = true; //Se activa el booleano springListIsFull cuando la lista de muelles se ha llenado con todos los elementos del objeto
 
         ListOfSprings = springs; //Para poder hacer uso de OnDrawGizmos() se pasa la lista springs a ListOfSprings
@@ -200,7 +212,7 @@ public class MassSpringCloth : MonoBehaviour
             Gizmos.color = Color.red;
             foreach (var spring in ListOfSprings) //Se recorre cada muelle de la lista
             {
-                if (spring.k == kT)
+                if (spring.k == kT) //Si es un muelle de tracción, se pinta de rojo. kT es la constante de rigidez de un muelle de tracción
                 {
                     Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
                 }
@@ -209,7 +221,7 @@ public class MassSpringCloth : MonoBehaviour
             Gizmos.color = Color.blue;
             foreach (var spring in ListOfSprings) //Se recorre cada muelle de la lista
             {
-                if (spring.k == kF)
+                if (spring.k == kF) //Si es un muelle de flexión, se pinta de azul. kF es la constante de rigidez de un muelle de flexión
                 {
                     Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
                 }
@@ -285,6 +297,10 @@ public class MassSpringCloth : MonoBehaviour
                 node.pos += h * node.vel;
                 verts[i] = node.pos; //Asignamos el nuevo valor de la posición del nodo al array verts
                 node.force = -(mass) * gravity;
+
+
+                node.force -= (dampingNodes) * node.vel; //Frenamos el movimiento absoluto de los nodos
+
             }
             i++; //Como se ha terminado una iteración, sumamos 1 sobre la variable que hemos creado para permitir que verts[i] y node, correspondan en posición
         }
@@ -302,6 +318,11 @@ public class MassSpringCloth : MonoBehaviour
                 * spring.u;
             spring.nodeB.force += spring.k * (spring.length - spring.length0)
                 * spring.u;
+
+            //Frenamos la deformación de los muelles, como la fuerza se divide en nodoA y nodoB, habrá que hacer una pequeña modificación para que sean fuerzas contrarias
+            spring.nodeA.force -= dampingSprings * (Vector3.Dot(spring.u, (spring.nodeA.vel - spring.nodeB.vel))) * spring.u; 
+            spring.nodeB.force -= dampingSprings * (Vector3.Dot(spring.u, (spring.nodeB.vel - spring.nodeA.vel))) * spring.u;
+
         }
 
         // Recorremos de nuevo la lista de nodos para calcular la nueva
@@ -328,6 +349,10 @@ public class MassSpringCloth : MonoBehaviour
         foreach (Node node in ListOfNodes)
         {
             node.force = -(mass) * gravity;
+
+
+            node.force -= (dampingNodes) * node.vel; //Frenamos el movimiento absoluto de los nodos
+
         }
 
         // Recorremos la lista de muelles para añadir a cada nodo la fuerza
@@ -340,6 +365,12 @@ public class MassSpringCloth : MonoBehaviour
                 * spring.u;
             spring.nodeB.force += spring.k * (spring.length - spring.length0)
                 * spring.u;
+
+
+            //Frenamos la deformación de los muelles, como la fuerza se divide en nodoA y nodoB, habrá que hacer una pequeña modificación para que sean fuerzas contrarias
+            spring.nodeA.force -= dampingSprings * (Vector3.Dot(spring.u, (spring.nodeA.vel - spring.nodeB.vel))) * spring.u;
+            spring.nodeB.force -= dampingSprings * (Vector3.Dot(spring.u, (spring.nodeB.vel - spring.nodeA.vel))) * spring.u;
+
         }
 
         // Recorremos de nuevo la lista de nodos para calcular la nueva
