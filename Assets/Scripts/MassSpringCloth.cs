@@ -1,3 +1,4 @@
+using Mono.Cecil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,7 @@ using UnityEngine;
 public class MassSpringCloth : MonoBehaviour
 {
     public float mass = 5f;
-
+    
     public bool paused; //Booleano que nos servirá para pausar la animación
 
     public enum Integration //Los diferentes métodos de integración disponibles
@@ -17,7 +18,7 @@ public class MassSpringCloth : MonoBehaviour
 
     public Integration integrationMethod; //Este será el método de integración escogido
 
-    public float h = 0.1f; //El paso de integración
+    public float h = 0.02f; //El paso de integración
 
     public List<Spring> ListOfSprings; //Lista de muelles
     bool springListIsFull = false; //Booleano para comprobar si la lista de muelles está llena
@@ -36,7 +37,7 @@ public class MassSpringCloth : MonoBehaviour
 
     Vector3[] verts;
 
-
+    Vector3Int[] edges; //Creamos un array edges de tipo Vector3Int (para ahorrarnos el casting de float a int), para asignar las aristas 
 
     void Start()
     {
@@ -50,29 +51,119 @@ public class MassSpringCloth : MonoBehaviour
 
         List<Node> nodes = new List<Node>(vertices.Length); //Se crea una lista de nodos cuyo tamaño sea el de los vértices de la mesh
         List<Spring> springs = new List<Spring>(); //Se crea una lista de muelles cuyo tamaño es indefinido (ya que se presupone que podemos usar cualquier bandera)
+        List<Spring> springsF = new List<Spring>(); //Se crea una lista de muelles cuyo tamaño es indefinido (ya que se presupone que podemos usar cualquier bandera)
 
-        for(int i = 0; i < vertices.Length; i++) //Se itera tantas veces como vértices hay en el array vertices
+        int[] triangles = mesh.triangles; //Se guardan en un array todos los triángulos de la mesh
+
+        for(int i = 0; i < vertices.Length; i++) //Se itera tantas veces como vértices hay en el array vertices, complejidad O(n)
         {
             nodes.Add(new Node(vertices[i], fixer)); //Cada vez que se itera sobre el bucle de vértices de la mesh, se añade un nuevo nodo, cuya posición corresponde a la de su vértice
                                                      //Además, se comprueba, mediante la lista de fixers, si dicho nodo debe estar fijado antes de comenzar la animación
-            Debug.Log("\t \t Distancia del nodo " + i + " con el primer fixer: "+nodes[i].offset[0].sqrMagnitude);
-            Debug.Log("\t \t Distancia del nodo " + i + " con el segundo fixer: " + nodes[i].offset[1].sqrMagnitude);
-            Debug.Log("Posición del nodo: " + nodes[i].pos);
+            //Debug.Log("\t \t Distancia del nodo " + i + " con el primer fixer: "+nodes[i].offset[0].sqrMagnitude);
+            //Debug.Log("\t \t Distancia del nodo " + i + " con el segundo fixer: " + nodes[i].offset[1].sqrMagnitude);
+            //Debug.Log("Posición del nodo: " + nodes[i].pos);
+
+            verts[i] = nodes[i].pos; //Se rellena el array verts con sus correspondientes nodos del array nodes
         }
         nodeListIsFull = true; //Se activa el booleano nodeListIsFull cuando la lista de nodos se ha llenado con todos los elementos del objeto
 
         ListOfNodes = nodes; //Para poder hacer uso de OnDrawGizmos() se pasa la lista nodes a ListOfNodes
 
+        //triangles.OrderBy(triangle => triangle); //Reordena el array de triángulos en función del primer índice de cada triángulo, su complejidad es O(nlog(n))
 
+        Vector3 aux;
 
-        int[] triangles = mesh.triangles; //Se guardan en un array todos los triángulos de la mesh
+        edges = new Vector3Int[triangles.Length]; //Creamos la estructura edges, para almacenar todas las aristas
 
-        for (int i = 0; i < triangles.Length - 3; i+=3)  //Se itera tantas veces como triángulos hay en el array triangles, es decir, que si hay 600 vértices en el array, iteramos 200 veces
+        for(int i = 0; i<edges.Length-1; i+=3) //Recorremos el array triangles, para asignar a edges cada arista
         {
+            edges[i] = new Vector3Int(Math.Min(triangles[i], triangles[i+1]), Math.Max(triangles[i], triangles[i + 1]), triangles[i + 2]); // ABC
+            edges[i+1] = new Vector3Int(Math.Min(triangles[i], triangles[i + 2]), Math.Max(triangles[i], triangles[i + 2]), triangles[i + 1]); // ACB
+            edges[i+2] = new Vector3Int(Math.Min(triangles[i + 1], triangles[i + 2]), Math.Max(triangles[i + 1], triangles[i + 2]), triangles[i]);// BCA 
+
+            int x = i + 1;
+            int y = i + 2;
+            Debug.Log("Arista " + i + ": " + edges[i].x + " " + edges[i].y + " " + edges[i].z);
+            Debug.Log("Arista " + x + ": " + edges[i+1].x + " " + edges[i+1].y + " " + edges[i+1].z);
+            Debug.Log("Arista " + y + ": " + edges[i+2].x + " " + edges[i+2].y + " " + edges[i+2].z);
+        }
+
+        edges = edges.OrderBy(edge => edge.x).ThenBy(edge => edge.y).ToArray(); //Ordenamos el array edges en función del primer parámetro de una arista, y luego, en función del segundo parámetro
+
+        for(int i = 0; i < edges.Length - 2; i++) //Se itera tantas veces como aristas hay (600 en el caso original)
+        {
+
+            if (edges[i].x == edges[i + 1].x && edges[i].y == edges[i + 1].y) //Si dos aristas (adyacentes en la lista) se detectan como duplicadas, se añadirá un nodo de flexión y se evitará añadir un muelle de tracción
+            {
+                springs.Add(new Spring(kF, nodes[edges[i].z], nodes[edges[i + 1].z])); //Se añade un nodo de flexión entre nodos opuestos de triángulos adyacentes
+            }
+            else
+            {
+                springs.Add(new Spring(kT, nodes[edges[i].x], nodes[edges[i].y])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+                springs.Add(new Spring(kT, nodes[edges[i].x], nodes[edges[i].z])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+                springs.Add(new Spring(kT, nodes[edges[i].y], nodes[edges[i].z])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+            }
+        }
+
+        /*for (int i = 0; i < triangles.Length - 1; i+=3)  //Se itera tantas veces como triángulos hay en el array triangles, es decir, que si hay 600 vértices en el array, iteramos 200 veces, complejidad O(log(n))
+        {
+            //El índice del primer nodo de un triángulo siempre es menor que el segundo índice
+
+            //Hay que hacer una estructura Edge que almacene los nodos de los triángulos y que, entre cada iteración, debe comprobar si los nodos A y B de la anterior estructura Edge son iguales
+            //Ya que, de serlo, será necesario eliminar esa arista
+
+            //Para añadir los muelles flexión, se dependerá de comprobar si hay aristas compartidas, de modo que, si hay una ariasta diagonal compartida en dos triánngulos, simplemente se 
+            //borrará la arista duplicada y se le dirá al código que debe unir el primer vértice del primer triángulo, con el tercer vértice del segundo triángulo (el nodo A con el nodo D)
+            //Si tenemos un Edge(B,C,A) y un Edge(B,C,D), veremos que el muelle de flexión deberá unirse siempre entre los últimos vértices de cada triángulo
+            
+            
+            
+            /*if (i >= 3) //Para comprobar hacia atrás, debemos haber iterado al menos una vez, de lo contrario no podremos eliminar duplicados (porque no habrá)
+            {
+                if (triangles[i] == triangles[i - 3] && triangles[i + 1] == triangles[i - 2]) //Si el primer vértice y el segundo vértice coinciden
+                {
+
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+                    springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+                
+                }else if(triangles[i] == triangles[i - 3] && triangles[i + 2] == triangles[i - 1]) //Si el primer vértice y el tercer vértice coinciden
+                {
+
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+                    springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+
+                }
+                else if(triangles[i+2] == triangles[i - 1] && triangles[i + 1] == triangles[i - 2]) //Si el segundo vértice y el tercer vértice coinciden
+                {
+                
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+                
+                }
+                else
+                {
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+                    springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+                    springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+                }
+                //Debug.Log("Triángulo " + i / 3 + ": " + triangles[i] + " " + triangles[i + 1] + " " + triangles[i + 2]);
+            }
+            else
+            {
+                springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
+                springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
+                springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
+                Debug.Log("Triángulo " + i / 3 + ": " + triangles[i] + " " + triangles[i + 1] + " " + triangles[i + 2]);
+            }
+            //Debug.Log("Triángulo 2: " + triangles[3] + " " + triangles[4] + " " + triangles[5]);
+
             springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 1]])); //Añade un muelle entre el primer y segundo vértice del triángulo con una determinada constante de rigidez
             springs.Add(new Spring(kT, nodes[triangles[i]], nodes[triangles[i + 2]])); //Añade un muelle entre el primer y tercer vértice del triángulo con una determinada constante de rigidez
             springs.Add(new Spring(kT, nodes[triangles[i + 1]], nodes[triangles[i + 2]])); //Añade un muelle entre el segundo y tercer vértice del triángulo con una determinada constante de rigidez
-        }
+            //Debug.Log("Triángulo " + i / 3 + ": " + triangles[i] + " " + triangles[i + 1] + " " + triangles[i + 2]);
+        }*/
+
+        Debug.Log(springs.Count); //El número total debería ser, en este caso, 221, la suma de los muelles horizontales, diagonales y verticales
         springListIsFull = true; //Se activa el booleano springListIsFull cuando la lista de muelles se ha llenado con todos los elementos del objeto
 
         ListOfSprings = springs; //Para poder hacer uso de OnDrawGizmos() se pasa la lista springs a ListOfSprings
@@ -89,12 +180,18 @@ public class MassSpringCloth : MonoBehaviour
     //rellenar Gizmos que no existen
     void DrawIfNotNull()
     {
+        int i = 0;
         if (nodeListIsFull) 
         {
             Gizmos.color = Color.green; //Se asigna color verde a los gizmos esféricos de los nodos
             foreach (var node in ListOfNodes) //Se recorre cada nodo de la lista
             {
+                if (i == 9 || i == 21 || i == 10) Gizmos.color = Color.blue; // NodoA: 9 NodoB: 21 NodoC: 10
+                else if (i == 20) Gizmos.color = Color.black; //  9 20 21 //NodoA: 9 NodoB: 21 NodoC: 10
+                else if (i == 0) Gizmos.color = Color.yellow;
+                else Gizmos.color = Color.green;
                 Gizmos.DrawSphere(node.pos, 0.2f); //Se pinta una esfera de radio 0.2 (unidades de Unity) sobre cada nodo de la lista
+                i++;
             }
         }
 
@@ -103,8 +200,19 @@ public class MassSpringCloth : MonoBehaviour
             Gizmos.color = Color.red;
             foreach (var spring in ListOfSprings) //Se recorre cada muelle de la lista
             {
-                //Gizmos.color = Color.red;
-                Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
+                if (spring.k == kT)
+                {
+                    Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
+                }
+            }
+
+            Gizmos.color = Color.blue;
+            foreach (var spring in ListOfSprings) //Se recorre cada muelle de la lista
+            {
+                if (spring.k == kF)
+                {
+                    Gizmos.DrawLine(spring.nodeA.pos, spring.nodeB.pos); //Se pinta una línea sobre cada muelle de la lista
+                }
             }
         }
     }
@@ -165,6 +273,7 @@ public class MassSpringCloth : MonoBehaviour
     void integrateExplicitEuler()
     {
         int i = 0;
+        Vector3 gravity = transform.InverseTransformDirection(g); //Reconvertimos el vector de la gravedad para que la tela caiga hacia el suelo (y no hacia su eje y local)
         // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
         // ellos
         foreach (Node node in ListOfNodes)
@@ -174,12 +283,14 @@ public class MassSpringCloth : MonoBehaviour
                 // r_(n+1) = r_n + h * v_n
 
                 node.pos += h * node.vel;
-                this.GetComponent<MeshFilter>().mesh.vertices[i].Set(node.pos.x, node.pos.y, node.pos.z);
-                this.GetComponent<MeshFilter>().mesh.RecalculateBounds();
-                node.force = -(mass/*/ListOfNodes.Count*/) * g;
+                verts[i] = node.pos; //Asignamos el nuevo valor de la posición del nodo al array verts
+                node.force = -(mass) * gravity;
             }
-            i++;
+            i++; //Como se ha terminado una iteración, sumamos 1 sobre la variable que hemos creado para permitir que verts[i] y node, correspondan en posición
         }
+        this.GetComponent<MeshFilter>().mesh.vertices = verts; //Cambiamos la posición del vértice de la mesh a la que indique el array verts
+        this.GetComponent<MeshFilter>().mesh.RecalculateBounds(); //Se recalcula el "bounding volume" de la mesh y todas sus sub-meshes con los datos de sus vértices
+        this.GetComponent<MeshCollider>().sharedMesh = this.GetComponent<MeshFilter>().mesh; //Se cambia el collider de la bandera para que se vea afectado por los cambios de los vértices
 
         // Recorremos la lista de muelles para añadir a cada nodo la fuerza
         // elástica de cada muelle. Por la ley de acción y reacción, estas
@@ -200,7 +311,7 @@ public class MassSpringCloth : MonoBehaviour
             if (!node.fixedNode) // Si el nodo no es fijo
             {
                 // v_(n+1) = v_n + h F_n / m
-                node.vel += h * node.force / (mass/*/ListOfNodes.Count*/);
+                node.vel += h * node.force / (mass);
             }
         }
     }
@@ -211,11 +322,12 @@ public class MassSpringCloth : MonoBehaviour
     void integrateSymplecticEuler()
     {
         int i = 0;
+        Vector3 gravity = transform.InverseTransformDirection(g); //Reconvertimos el vector de la gravedad para que la tela caiga hacia el suelo (y no hacia su eje y local)
         // Recorremos la lista de nodos para aplicar las fuerzas a cada uno de
         // ellos
         foreach (Node node in ListOfNodes)
         {
-            node.force = -(mass) * g;
+            node.force = -(mass) * gravity;
         }
 
         // Recorremos la lista de muelles para añadir a cada nodo la fuerza
@@ -242,10 +354,12 @@ public class MassSpringCloth : MonoBehaviour
                 node.vel += h * node.force / (mass);
                 // r_(n+1) = r_n + h * v_(n+1)
                 node.pos += h * node.vel;
-                this.GetComponent<MeshFilter>().mesh.vertices[i].Set(node.pos.x, node.pos.y, node.pos.z);
-                this.GetComponent<MeshFilter>().mesh.RecalculateBounds();
+                verts[i] = node.pos; //Asignamos el nuevo valor de la posición del nodo al array verts
             }
-            i++;
+            i++; //Como se ha terminado una iteración, sumamos 1 sobre la variable que hemos creado para permitir que verts[i] y node, correspondan en posición
         }
+        this.GetComponent<MeshFilter>().mesh.vertices = verts; //Cambiamos la posición del vértice de la mesh a la que indique el array verts
+        this.GetComponent<MeshFilter>().mesh.RecalculateBounds(); //Se recalcula el "bounding volume" de la mesh y todas sus sub-meshes con los datos de sus vértices
+        this.GetComponent<MeshCollider>().sharedMesh = this.GetComponent<MeshFilter>().mesh; //Se cambia el collider de la bandera para que se vea afectado por los cambios de los vértices
     }
 }

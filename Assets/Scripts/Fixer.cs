@@ -11,7 +11,7 @@ public class Fixer : MonoBehaviour
                                                                //Es importante que el (o los) fixer se encuentre como hijo del objeto que tenga el script MassSpringCloth
                                                                //De lo contrario, no sucederá lo que se busca
         this.GetComponent<MeshRenderer>().enabled = true; //Se muestra el fixer en primera instancia, para ocultarlo se podrá pulsar la tecla 'H' o presionar sobre el tick del panel
-        Debug.Log("Posición del fixer: " + pos); 
+        //Debug.Log("Posición del fixer: " + pos); 
     }
 
     // Update is called once per frame
