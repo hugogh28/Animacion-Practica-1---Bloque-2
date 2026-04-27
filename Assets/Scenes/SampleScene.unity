@@ -1322,13 +1322,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1640bc053fe3fad478596f6caaf28ac0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mass: 20
+  mass: 5
   paused: 1
   integrationMethod: 1
   h: 0.1
   g: {x: 0, y: 9.8, z: 0}
-  kT: 50
-  kF: 5
+  kT: 10
+  kF: 1
   fixer:
   - {fileID: 464204232}
   - {fileID: 60833569}
