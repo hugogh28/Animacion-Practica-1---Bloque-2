@@ -1,6 +1,17 @@
-using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
-using UnityEngine.Android;
+
+/******************************************************************************
+* GRADO EN DISEÑO Y DESARROLLO DE VIDEOJUEGOS - ANIMACIÓN 3D
+* Bloque 2 - Práctica Entregable 1
+*
+* Nombre y apellidos: Hugo García Hernández
+* DNI: 03212391G
+* Curso académico: 2025-2026
+*
+* Nombre de la clase: MassSpringCloth
+* Breve descripción: La siguiente clase de C# gestiona todos los cálculos que deben efectuarse en la creación de un muelle (y lo prepara para sus posteriores modificaciones en MassSpringCloth), de este modo, se logra que 
+* el animador pueda ver por pantalla una físicas adecuadas.
+*****************************************************************************/
 
 public class Spring 
 {
@@ -28,6 +39,8 @@ public class Spring
         u = Vector3.Normalize(u); //Vector normalizado que almacena la orientación del muelle
         pos = (A.pos + B.pos) / 2f; //Posición del punto medio del muelle, calculado en base a la media aritmética de las posiciones de sus nodos
         rotation = Quaternion.FromToRotation(Vector3.up, u); //Orientación del muelle según el vector dirección
+
+        length = length0; //Asignamos el cálculo inicial de la longitud al muelle (para poder hacer cálculos a posteriori)
     }
 
     Vector3 VectorBetweenNodes(Node A, Node B) //Calcula el vector (de dirección) entre dos nodos 
